@@ -49,8 +49,8 @@ Telegram chat: [https://t.me/fragment_software_chat](https://t.me/fragment_softw
 Клонируйте репозиторий и соберите проект:
 
 ```
-git clone https://github.com/Fragment-Software/polymarket-eye.git
-cd polymarket-eye
+git clone https://github.com/Fragment-Software/aptos-commemorative-minter.git
+cd aptos-commemorative-minter
 cargo build --release
 ```
 
