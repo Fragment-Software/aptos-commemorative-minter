@@ -7,7 +7,6 @@ const CONFIG_FILE_PATH: &str = "data/config.toml";
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub struct Config {
     pub rpc_url: String,
-    pub mint_quantity_range: [u64; 2],
     pub wallet_delay_range: [u64; 2],
 }
 
