@@ -6,7 +6,7 @@ use rand::Rng;
 use term_size::dimensions;
 use tokio::io::AsyncBufReadExt;
 
-use crate::constants::PRIVATE_KEYS_FILE_PATH;
+use crate::constants::SECRETS_FILE_PATH;
 
 async fn read_file_lines(path: impl AsRef<Path>) -> eyre::Result<Vec<String>> {
     let file = tokio::fs::read(path).await?;
@@ -21,11 +21,16 @@ async fn read_file_lines(path: impl AsRef<Path>) -> eyre::Result<Vec<String>> {
 }
 
 pub async fn read_private_keys() -> Vec<LocalAccount> {
-    read_file_lines(PRIVATE_KEYS_FILE_PATH)
+    read_file_lines(SECRETS_FILE_PATH)
         .await
-        .expect("Private keys file to be valid")
+        .expect("Secrets file to be valid")
         .iter()
-        .map(|pk| LocalAccount::from_private_key(pk, 0).expect("Private key to be valid"))
+        .map(|secret| {
+            LocalAccount::from_private_key(secret, 0)
+                .or_else(|_| LocalAccount::from_derive_path("m/44'/637'/0'/0'/0'", secret, 0))
+                .unwrap_or_else(|_| panic!("Failed to create LocalAccount from private key or derivation path for key: {}",
+                    secret))
+        })
         .collect()
 }
 
