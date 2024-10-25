@@ -14,6 +14,7 @@ use aptos_sdk::{
         LocalAccount,
     },
 };
+use log::error;
 use rand::{thread_rng, Rng};
 
 use crate::{
@@ -66,6 +67,46 @@ fn assemble_and_sign_mint_tx(
     account.sign_transaction(raw_transaction)
 }
 
+async fn mint_nft(account: &LocalAccount, provider: Arc<Client>) -> eyre::Result<bool> {
+    let seq_number = get_account_seq_number(account, provider.clone()).await?;
+
+    let signed_transaction = assemble_and_sign_mint_tx(account, seq_number, 1);
+
+    let simulation_result = provider
+        .simulate_bcs_with_gas_estimation(&signed_transaction, true, true)
+        .await?;
+
+    if let ExecutionStatus::MoveAbort { info, .. } = simulation_result.inner().info.status() {
+        match info {
+            Some(ref info) if info.reason_name == "EINSUFFICIENT_MAX_PER_USER_BALANCE" => {
+                log::warn!("{} has already minted the NFT", account.address());
+                return Ok(true);
+            }
+            _ => {}
+        }
+    }
+
+    log::info!("Account: {}. Minting an NFT", account.address());
+
+    let pending_transaction = provider.submit(&signed_transaction).await?;
+
+    let confirmed_transaction = provider
+        .wait_for_transaction(pending_transaction.inner())
+        .await?;
+
+    if confirmed_transaction.inner().success() {
+        let tx_hash = pending_transaction.inner().hash;
+        log::info!(
+            "Transaction confirmed: {}/txn/{}",
+            APTOS_EXPLORER_URL,
+            tx_hash
+        );
+        return Ok(true);
+    }
+
+    Ok(false)
+}
+
 pub async fn process_accounts(
     mut accounts: Vec<LocalAccount>,
     config: Config,
@@ -77,58 +118,15 @@ pub async fn process_accounts(
         let index = rng.gen_range(0..accounts.len());
         let account = &accounts[index];
 
-        let seq_number = get_account_seq_number(account, provider.clone()).await;
-
-        if let Ok(seq_number) = seq_number {
-            let signed_transaction = assemble_and_sign_mint_tx(account, seq_number, 1);
-
-            match provider
-                .simulate_bcs_with_gas_estimation(&signed_transaction, true, true)
-                .await
-            {
-                Ok(sim_result) => {
-                    if let ExecutionStatus::MoveAbort { info, .. } =
-                        sim_result.inner().info.status()
-                    {
-                        match info {
-                            Some(ref info)
-                                if info.reason_name == "EINSUFFICIENT_MAX_PER_USER_BALANCE" =>
-                            {
-                                log::warn!("{} has already minted the NFT", account.address());
-                                accounts.remove(index);
-                                continue;
-                            }
-                            _ => {}
-                        }
-                    }
-                }
-                Err(e) => {
-                    log::error!("Transaction simulation failed: {e}");
-                    continue;
+        match mint_nft(account, provider.clone()).await {
+            Ok(res) => {
+                if res {
+                    accounts.remove(index);
+                    pretty_sleep(config.wallet_delay_range).await;
                 }
             }
-
-            log::info!("Account: {}. Minting an NFT", account.address());
-
-            match provider.submit(&signed_transaction).await {
-                Ok(pending_tx) => {
-                    if let Ok(transaction) = provider.wait_for_transaction(pending_tx.inner()).await
-                    {
-                        if transaction.inner().success() {
-                            accounts.remove(index);
-
-                            let tx_hash = pending_tx.inner().hash;
-                            log::info!(
-                                "Transaction confirmed: {}/txn/{}",
-                                APTOS_EXPLORER_URL,
-                                tx_hash
-                            );
-
-                            pretty_sleep(config.wallet_delay_range).await;
-                        }
-                    }
-                }
-                Err(e) => log::error!("Failed to send trasnaction: {e}"),
+            Err(e) => {
+                error!("`{}` mint failed: {e}", account.address())
             }
         }
     }
