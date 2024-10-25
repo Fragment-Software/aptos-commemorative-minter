@@ -1,14 +1,11 @@
-use std::sync::Arc;
-
-use aptos_sdk::rest_client::Client;
-use config::Config;
-use minter::process_accounts;
-use utils::read_private_keys;
-
 mod config;
 mod constants;
+mod menu;
 mod minter;
+mod parser;
 mod utils;
+
+use menu::menu;
 
 #[tokio::main]
 async fn main() -> eyre::Result<()> {
@@ -16,12 +13,9 @@ async fn main() -> eyre::Result<()> {
         .filter_level(log::LevelFilter::Info)
         .init();
 
-    let config = Config::read_default().await;
-
-    let provider = Arc::new(Client::new(config.rpc_url.parse()?));
-    let accounts = read_private_keys().await;
-
-    process_accounts(accounts, config, provider).await;
+    if let Err(e) = menu().await {
+        log::error!("Execution stopped with error: {e}");
+    }
 
     Ok(())
 }

@@ -20,7 +20,7 @@ use rand::{thread_rng, Rng};
 use crate::{
     config::Config,
     constants::{APTOS_EXPLORER_URL, COLLECTION_ID, MINTER_CONTRACT_ADDRESS, TX_TIMEOUT},
-    utils::pretty_sleep,
+    utils::misc::pretty_sleep,
 };
 
 async fn get_account_seq_number(

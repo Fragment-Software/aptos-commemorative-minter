@@ -2,6 +2,7 @@ use aptos_sdk::types::account_address::AccountAddress;
 use std::{str::FromStr, sync::LazyLock};
 
 pub const SECRETS_FILE_PATH: &str = "data/secrets.txt";
+pub const PROXIES_FILE_PATH: &str = "data/proxies.txt";
 
 pub static COLLECTION_ID: LazyLock<AccountAddress> = LazyLock::new(|| {
     AccountAddress::from_str("0xd42cd397c41a62eaf03e83ad0324ff6822178a3e40aa596c4b9930561d4753e5")
